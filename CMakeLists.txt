@@ -19,4 +19,5 @@ include_directories(include/nlohmann/thirdparty/hedley)
 add_executable(QuickIM
         main.cpp
         utils/client.cpp
-        utils/server.cpp)
+        utils/server.cpp
+)

@@ -19,14 +19,15 @@ private:
     std::string ip;
     int port;
     int sockfd;
+    int iid;
 public:
     TCPClient() = default;
-    TCPClient(const std::string& path);
+    TCPClient(const std::string& path, int id);
     TCPClient(const TCPClient&) = delete;
     ~TCPClient();
 
     void connect_server();
-    void send_msg(const std::string& msg);
+    void send_msg(int id, const std::string& msg);
 };
 
 

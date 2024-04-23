@@ -11,7 +11,9 @@
 #include <fstream>
 #include <string>
 #include <vector>
-
+#include <map>
+#include "MessageQueue.h"
+#include "MessageType.h"
 
 class TCPServer
 {
@@ -20,6 +22,9 @@ private:
     int port;
     int sock_fd;
     std::vector<int> client_fds;
+    std::vector<pthread_t> threads;
+    static MessageQueue<MessageType> mq;
+    static std::map<int, int> account;
 public:
     TCPServer() = default;
     TCPServer(const std::string& path);
@@ -28,6 +33,7 @@ public:
 
     void accept_connection();
     static void* handle_client_request(void* client_fd);
+    static void* start(void *);
 };
 
 

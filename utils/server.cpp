@@ -2,6 +2,9 @@
 #include <stdexcept>
 #include <cstring>
 
+MessageQueue<MessageType> TCPServer::mq = MessageQueue<MessageType>();
+std::map<int, int> TCPServer::account = std::map<int, int>();
+
 TCPServer::TCPServer(const std::string& path)
 {
     // 使用std::ifstream读取json内容
@@ -44,50 +47,100 @@ TCPServer::~TCPServer()
     for (auto client_fd : client_fds) {
         close(client_fd);
     }
+    for (auto tid : threads) {
+        pthread_detach(tid);
+    }
 }
 
 void TCPServer::accept_connection()
 {
-    while (true) {
-        struct sockaddr_in client_addr;
-        socklen_t client_len = sizeof(client_addr);
-        int client_fd{ accept(sock_fd, (struct sockaddr*)&client_addr, &client_len) };
-        if (client_fd < 0) {
-            throw std::runtime_error{ "[Error]: Failed accepting client connection" };
-        }
-        client_fds.push_back(client_fd);
+    try {
+        while (true) {
+            struct sockaddr_in client_addr;
+            socklen_t client_len = sizeof(client_addr);
+            int client_fd{ accept(sock_fd, (struct sockaddr*)&client_addr, &client_len) };
+            if (client_fd < 0) {
+                throw std::runtime_error{ "[Error]: Failed accepting client connection" };
+            }
+            client_fds.push_back(client_fd);
 
-        // 处理客户端请求
-        pthread_t tid;
-        if (pthread_create(&tid, nullptr, handle_client_request, (void*)&client_fd)) {
-            std::cout << "[Warning]: Failed creating thread with client_fd : " << client_fd << std::endl;
-            close(client_fd);
-            continue;
+            // 处理客户端请求
+            pthread_t tid;
+            if (pthread_create(&tid, nullptr, handle_client_request, (void*)&client_fd)) {
+                std::cout << "[Warning]: Failed creating thread with client_fd : " << client_fd << std::endl;
+                close(client_fd);
+                continue;
+            }
+            threads.push_back(tid);
         }
-        pthread_detach(tid);
     }
-
-    // handle_client_request(client_fd);
+    catch (std::exception& e) {
+        std::cout << "[Error accept]: " << e.what() << std::endl;
+    }
 }
 
 void* TCPServer::handle_client_request(void* client_fd)
 {
     int fd{ *(int*)client_fd };
+    try {
+        while (true) { // TODO: 客户端退出，服务端还没退出
+            char buffer[40960]{ 0 };
+            ssize_t bytes_received = recv(fd, buffer, sizeof(buffer), 0);
+            if (bytes_received >= 0) {
+                buffer[bytes_received] = 0;
+                std::string buf{ buffer };
+                std::cout << buf << std::endl;
+                nlohmann::json j{ nlohmann::json::parse(buf) };
+                int from_fd{ fd };
+                std::string msg{ j["msg"] };
+                if (msg == "exit") {
+                    std::string response{ "Goodbye!" };
+                    send(fd, response.c_str(), response.size(), 0);
+                    std::cout << "[Info]: client" << fd << " exits" << std::endl;
+                    TCPServer::account.erase(j["from"]);
+                    close(fd);
+                    break;
+                }
+                else {
+                    TCPServer::mq.push(MessageType{ from_fd, j });
+                }
+            }
+        }
+    }
+    catch (std::exception& e) {
+        std::cout << "[Error handle]: " << e.what() << std::endl;
+    }
+    pthread_exit(nullptr);
+}
+
+void* TCPServer::start(void* p)
+{
+    std::string response;
     while (true) {
-        char buffer[40960]{ 0 };
-        ssize_t bytes_received = recv(fd, buffer, sizeof(buffer), 0);
-        if (bytes_received >= 0) {
-            buffer[bytes_received] = 0;
-            if (strcmp(buffer, "exit") != 0) {
-                std::cout << "Received from client" << fd << ": " << buffer << std::endl;
-                std::string response{ "Hello, this is from server!" };
-                send(fd, response.c_str(), response.size(), 0);
+        auto task = TCPServer::mq.pop();
+        int from{ task.from_fd };
+        int from_id{ task.json["from"] }, to_id{ task.json["to"] };
+        std::string msg{ task.json["msg"] };
+        if (to_id == -1) {
+            if (TCPServer::account[from_id] != 0) {
+                response = "refused";
+                send(from, response.c_str(), response.size(), 0);
+                std::cout << "[Info]: client" << from << " exits" << std::endl;
+                close(from);
             }
             else {
-                std::string response{ "Goodbye!" };
-                send(fd, response.c_str(), response.size(), 0);
-                break;
+                TCPServer::account[from_id] = from;
+                response = "Welcome to QuickIM, " + std::to_string(from_id);
+                send(from, response.c_str(), response.size(), 0);
+                std::cout << "[Info]: client" << from << " connects" << std::endl;
             }
+        }
+        if (TCPServer::account[to_id] == 0) {
+            response = "[Warning]: User" + std::to_string(from_id) + " not exists";
+            send(from, response.c_str(), response.size(), 0);
+        }
+        else {
+            send(TCPServer::account[to_id], msg.c_str(), msg.size(), 0);
         }
     }
     pthread_exit(nullptr);

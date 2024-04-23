@@ -1,6 +1,7 @@
 #include "client.h"
+#include <sstream>
 
-TCPClient::TCPClient(const std::string& path)
+TCPClient::TCPClient(const std::string& path, int id)
 {
     // 使用std::ifstream读取json内容
     std::ifstream config_file{ path };
@@ -12,6 +13,7 @@ TCPClient::TCPClient(const std::string& path)
     ip = config["ip"];
     port = config["port"];
     sockfd = -1;
+    iid = id;
     connect_server();
 }
 
@@ -35,11 +37,19 @@ void TCPClient::connect_server()
     if (connect(sockfd, (struct sockaddr*)&server_addr, sizeof(server_addr)) < 0) {
         throw std::runtime_error{ "[Error]: Failed connecting to server" };
     }
+    send_msg(-1, std::to_string(iid));
 }
 
-void TCPClient::send_msg(const std::string& msg)
+void TCPClient::send_msg(int id, const std::string& msg)
 {
-    ssize_t bytes_sent{ send(sockfd, msg.c_str(), msg.size(), 0) };
+    nlohmann::json json_obj;
+    json_obj["from"] = iid;
+    json_obj["to"] = id;
+    json_obj["msg"] = msg;
+    std::cout << json_obj.dump() << std::endl;
+    std::string to_send{ json_obj.dump() };
+    std::cout << "to_send : " << to_send << std::endl;
+    ssize_t bytes_sent{ send(sockfd, to_send.c_str(), to_send.size(), 0) };
     if (bytes_sent < 0) {
         throw std::runtime_error{ "[Error]: Failed sending msg to server" };
     }
@@ -51,6 +61,9 @@ void TCPClient::send_msg(const std::string& msg)
     }
 
     buffer[bytes_received] = 0;
+    if (strcmp(buffer, "refused") == 0) {
+        throw std::runtime_error{ "[Exit]: Server tells to exit" };
+    }
     std::cout << "[Response]: " << buffer << std::endl;
 }
 
