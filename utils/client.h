@@ -20,6 +20,7 @@ private:
     int port;
     int sockfd;
     int iid;
+    pthread_t recv_thr;
 public:
     TCPClient() = default;
     TCPClient(const std::string& path, int id);
@@ -28,6 +29,8 @@ public:
 
     void connect_server();
     void send_msg(int id, const std::string& msg);
+    static void* recv_msg(void* fd);
+    void start();
 };
 
 

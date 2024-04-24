@@ -23,6 +23,7 @@ private:
     int sock_fd;
     std::vector<int> client_fds;
     std::vector<pthread_t> threads;
+    // static std::map<int, pthread_t> thrs;
     static MessageQueue<MessageType> mq;
     static std::map<int, int> account;
 public:

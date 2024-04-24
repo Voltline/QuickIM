@@ -46,25 +46,52 @@ void TCPClient::send_msg(int id, const std::string& msg)
     json_obj["from"] = iid;
     json_obj["to"] = id;
     json_obj["msg"] = msg;
-    std::cout << json_obj.dump() << std::endl;
+    // std::cout << json_obj.dump() << std::endl;
     std::string to_send{ json_obj.dump() };
-    std::cout << "to_send : " << to_send << std::endl;
+    // std::cout << "to_send : " << to_send << std::endl;
     ssize_t bytes_sent{ send(sockfd, to_send.c_str(), to_send.size(), 0) };
     if (bytes_sent < 0) {
         throw std::runtime_error{ "[Error]: Failed sending msg to server" };
     }
-
-    char buffer[40960]{ 0 };
-    ssize_t bytes_received{ recv(sockfd, buffer, sizeof(buffer), 0) };
-    if (bytes_received < 0) {
-        throw std::runtime_error{ "[Error]: Failed receiving msg from server" };
-    }
-
-    buffer[bytes_received] = 0;
-    if (strcmp(buffer, "refused") == 0) {
-        throw std::runtime_error{ "[Exit]: Server tells to exit" };
-    }
-    std::cout << "[Response]: " << buffer << std::endl;
 }
+
+void* TCPClient::recv_msg(void* fd)
+{
+    int recv_fd{ *(int*)fd };
+    while (true) {
+        char buffer[40960]{ 0 };
+        ssize_t bytes_received{ recv(recv_fd, buffer, sizeof(buffer), 0) };
+        if (bytes_received < 0) {
+            throw std::runtime_error{ "[Error]: Failed receiving msg from server" };
+        }
+
+        buffer[bytes_received] = 0;
+        if (strcmp(buffer, "refused") == 0) {
+            throw std::runtime_error{ "[Exit]: Server tells to exit" };
+        }
+        std::cout << "[Response]: " << buffer << std::endl;
+    }
+    pthread_exit(nullptr);
+}
+
+void TCPClient::start()
+{
+    pthread_create(&recv_thr, nullptr, TCPClient::recv_msg, &sockfd);
+    pthread_detach(recv_thr);
+    bool connected{ true };
+    while (connected) {
+        std::cout << "输入您要发送消息的ID：";
+        std::string s;
+        std::getline(std::cin, s);
+        int id{ stoi(s) };
+        std::cout << "输入消息：";
+        std::getline(std::cin, s);
+        send_msg(id, s);
+        if (s == "exit") {
+            connected = false;
+        }
+    }
+}
+
 
 

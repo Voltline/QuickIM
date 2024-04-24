@@ -130,17 +130,20 @@ void* TCPServer::start(void* p)
             }
             else {
                 TCPServer::account[from_id] = from;
-                response = "Welcome to QuickIM, " + std::to_string(from_id);
+                response = "Welcome to QuickIM, User " + std::to_string(from_id);
                 send(from, response.c_str(), response.size(), 0);
                 std::cout << "[Info]: client" << from << " connects" << std::endl;
             }
         }
-        if (TCPServer::account[to_id] == 0) {
-            response = "[Warning]: User" + std::to_string(from_id) + " not exists";
-            send(from, response.c_str(), response.size(), 0);
-        }
         else {
-            send(TCPServer::account[to_id], msg.c_str(), msg.size(), 0);
+            if (TCPServer::account[to_id] == 0) {
+                response = "[Warning]: User" + std::to_string(from_id) + " not exists";
+                send(from, response.c_str(), response.size(), 0);
+            }
+            else {
+                msg = "From: " + std::to_string(from_id) + msg;
+                send(TCPServer::account[to_id], msg.c_str(), msg.size(), 0);
+            }
         }
     }
     pthread_exit(nullptr);
