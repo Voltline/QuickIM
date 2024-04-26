@@ -13,6 +13,14 @@
 * The project starts on April 23, 2024
 * The project based on MIT protocol
 
+## 注意事项
+* 此项目基于POSIX下的套接字、多线程库开发，仅能在UNIX和类UNIX系统下运行
+* 推荐使用各种Linux发行版与macOS
+
+## Caution
+* The project based on POSIX socket and pthread library. So it can just run on UNIX/UNIX-like OS.
+* Recommend to use various Linux releases or macOS to run this project
+
 ## 项目信息/About QuickIM
 ### 语言/Lang
 * 语言/Lang：C++
@@ -21,4 +29,4 @@
 * spdlog
 ### 开源协议/Open-Source Protocol
 * MIT
- 
+
