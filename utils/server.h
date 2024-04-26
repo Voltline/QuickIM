@@ -15,6 +15,7 @@
 #include <map>
 #include "MessageQueue.h"
 #include "MessageType.h"
+#include "type.h"
 
 class TCPServer
 {

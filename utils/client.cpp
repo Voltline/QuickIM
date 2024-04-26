@@ -1,5 +1,6 @@
 #include "client.h"
 #include <sstream>
+#include <set>
 
 bool TCPClient::just_connect = true;
 
@@ -40,15 +41,37 @@ void TCPClient::connect_server()
     if (connect(sockfd, (struct sockaddr*)&server_addr, sizeof(server_addr)) < 0) {
         throw std::runtime_error{ "Failed connecting to server" };
     }
-    send_msg(-1, std::to_string(iid));
+    send_msg(Type::Login);
 }
 
-void TCPClient::send_msg(int id, const std::string& msg)
+void TCPClient::send_msg(const Type& type, const nlohmann::json& id, const std::string& msg)
 {
+    /*  报文格式
+     *  type为Type::Single/Multi/All时
+     *  {
+     *      "type": Type::Single/Multi/All,
+     *      "from": iid,
+     *      "to"  : [id],
+     *      "msg" : "msg"
+     *  }
+     *  type为Type::Login时
+     *  {
+     *      "type": Type::Login,
+     *      "from": iid
+     *  }
+     *  type为Type::Exit时
+     *  {
+     *      "type": Type::Exit,
+     *      "from": iid
+     *  }
+     */
     nlohmann::json json_obj;
+    json_obj["type"] = type;
     json_obj["from"] = iid;
-    json_obj["to"] = id;
-    json_obj["msg"] = msg;
+    if (type != Type::Login || type != Type::Exit) {
+        json_obj["to"] = id;
+        json_obj["msg"] = msg;
+    }
     std::string to_send{ json_obj.dump() };
     ssize_t bytes_sent{ send(sockfd, to_send.c_str(), to_send.size(), 0) };
     if (bytes_sent < 0) {
@@ -72,7 +95,7 @@ void* TCPClient::recv_msg(void* fd)
             throw std::runtime_error{ "Server tells to exit" };
         }
         if (strcmp(buffer, "") == 0) throw std::runtime_error{ "服务器已关闭" };
-        std::cout << "[Response]: " << buffer << std::endl;
+        std::cout << buffer << std::endl;
         just_connect = false;
     }
     pthread_exit(nullptr);
@@ -91,12 +114,34 @@ void TCPClient::start()
             std::istringstream sin{ s1 };
             std::cout << "输入消息：" << std::endl;
             std::getline(std::cin, s2);
-            int id{ 0 };
-            while (sin >> id) {
-                send_msg(id, s2);
-            }
             if (s2 == "exit") {
                 connected = false;
+                send_msg(Type::Exit);
+            }
+            else {
+                int id{ 0 };
+                nlohmann::json jarray{ nlohmann::json::array() };
+                std::set<int> idset;
+                while (sin >> id) {
+                    idset.insert(id);
+                }
+                std::vector<int> ids(idset.begin(), idset.end());
+                Type t;
+                if (ids.size() == 1) {
+                    if (ids[0] > 0) t = Type::Single;
+                    else {
+                        if (ids[0] == -2) t = Type::All;
+                    }
+                }
+                else {
+                    t = Type::Multi;
+                }
+
+                for (const auto& i : ids) {
+                    if (i >= 0) jarray.push_back(i);
+                }
+
+                send_msg(t, jarray, s2);
             }
         }
     }

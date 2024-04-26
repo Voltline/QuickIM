@@ -12,6 +12,7 @@
 #include <fstream>
 #include <string>
 #include <vector>
+#include "type.h"
 
 
 class TCPClient
@@ -30,7 +31,9 @@ public:
     ~TCPClient();
 
     void connect_server();
-    void send_msg(int id, const std::string& msg);
+    void send_msg(const Type& type,
+                  const nlohmann::json& id = nlohmann::json(),
+                  const std::string& msg = "");
     static void* recv_msg(void* fd);
     void start();
 };

@@ -84,7 +84,7 @@ void* TCPServer::handle_client_request(void* client_fd)
 {
     int fd{ *(int*)client_fd };
     try {
-        while (true) { // TODO: 客户端退出，服务端还没退出
+        while (true) {
             char buffer[40960]{ 0 };
             ssize_t bytes_received = recv(fd, buffer, sizeof(buffer), 0);
             if (bytes_received >= 0) {
@@ -92,9 +92,8 @@ void* TCPServer::handle_client_request(void* client_fd)
                 std::string buf{ buffer };
                 spdlog::info(buf);
                 nlohmann::json j{ nlohmann::json::parse(buf) };
-                int from_fd{ fd };
-                std::string msg{ j["msg"] };
-                if (msg == "exit") {
+                Type t{ j["type"] };
+                if (t == Type::Exit) {
                     std::string response{ "Goodbye!" };
                     send(fd, response.c_str(), response.size(), 0);
                     spdlog::info("client{} exits", fd);
@@ -105,7 +104,7 @@ void* TCPServer::handle_client_request(void* client_fd)
                     break;
                 }
                 else {
-                    TCPServer::mq.push(MessageType{ from_fd, j });
+                    TCPServer::mq.push(MessageType{ fd, j });
                 }
             }
         }
@@ -121,10 +120,10 @@ void* TCPServer::start(void* p)
     std::string response;
     while (true) {
         auto task = TCPServer::mq.pop();
+        Type t{ task.json["type"] };
         int from{ task.from_fd };
-        int from_id{ task.json["from"] }, to_id{ task.json["to"] };
-        std::string msg{ task.json["msg"] };
-        if (to_id == -1) {
+        if (t == Type::Login) {
+            int from_id{ task.json["from"] };
             if (TCPServer::account[from_id] != 0) {
                 int old_fd{ TCPServer::account[from_id] };
                 response = "refused";
@@ -136,25 +135,43 @@ void* TCPServer::start(void* p)
                 thrs.erase(old_fd);
             }
             TCPServer::account[from_id] = from;
-            response = "Welcome to QuickIM, User " + std::to_string(from_id);
+            response = "[Server] Welcome to QuickIM, User " + std::to_string(from_id);
             send(from, response.c_str(), response.size(), 0);
             spdlog::info("client{} connects", from);
         }
-        else if (to_id == -2) {
-            spdlog::info("client{} 发送了一条群发消息，内容为：{}", from_id, msg);
-            msg = "来自User" + std::to_string(from_id) + " 的群发消息：" + msg;
-            for (const auto& [user_id, user_fd] : account) {
-                send(user_fd, msg.c_str(), msg.size(), 0);
-            }
-        }
         else {
-            if (TCPServer::account[to_id] == 0) {
-                response = "[Warning]: User" + std::to_string(to_id) + " not exists";
-                send(from, response.c_str(), response.size(), 0);
+            int from_id{ task.json["from"] };
+            nlohmann::json to_id{ task.json["to"] };
+            std::string msg{ task.json["msg"] };
+            if (task.json["type"] == Type::Single) {
+                int to{ to_id[0] };
+                if (TCPServer::account[to] == 0) {
+                    response = "[Warning] User" + std::to_string(to) + " not exists";
+                    send(from, response.c_str(), response.size(), 0);
+                }
+                else {
+                    msg = "[From " + std::to_string(from_id) + "]: " + msg;
+                    send(TCPServer::account[to], msg.c_str(), msg.size(), 0);
+                }
+            }
+            else if (task.json["type"] == Type::Multi) {
+                msg = "[From " + std::to_string(from_id) + "] " + msg;
+                for (const auto & i : to_id) {
+                    if (TCPServer::account[i] == 0) {
+                        response = "[Warning] User" + std::to_string((int)i) + " not exists";
+                        send(from, response.c_str(), response.size(), 0);
+                    }
+                    else {
+                        send(TCPServer::account[i], msg.c_str(), msg.size(), 0);
+                    }
+                }
             }
             else {
-                msg = "From: " + std::to_string(from_id) + msg;
-                send(TCPServer::account[to_id], msg.c_str(), msg.size(), 0);
+                spdlog::info("client{} 发送了一条群发消息，内容为：{}", from_id, msg);
+                msg = "[群发][From " + std::to_string(from_id) + "] " + msg;
+                for (const auto& [user_id, user_fd] : account) {
+                    send(user_fd, msg.c_str(), msg.size(), 0);
+                }
             }
         }
     }
