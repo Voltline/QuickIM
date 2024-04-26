@@ -140,6 +140,13 @@ void* TCPServer::start(void* p)
             send(from, response.c_str(), response.size(), 0);
             spdlog::info("client{} connects", from);
         }
+        else if (to_id == -2) {
+            spdlog::info("client{} 发送了一条群发消息，内容为：{}", from_id, msg);
+            msg = "来自User" + std::to_string(from_id) + " 的群发消息：" + msg;
+            for (const auto& [user_id, user_fd] : account) {
+                send(user_fd, msg.c_str(), msg.size(), 0);
+            }
+        }
         else {
             if (TCPServer::account[to_id] == 0) {
                 response = "[Warning]: User" + std::to_string(to_id) + " not exists";

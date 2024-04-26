@@ -71,6 +71,7 @@ void* TCPClient::recv_msg(void* fd)
             if (!just_connect) spdlog::warn("另一台设备正在登录");
             throw std::runtime_error{ "Server tells to exit" };
         }
+        if (strcmp(buffer, "") == 0) throw std::runtime_error{ "服务器已关闭" };
         std::cout << "[Response]: " << buffer << std::endl;
         just_connect = false;
     }
@@ -84,14 +85,17 @@ void TCPClient::start()
         pthread_detach(recv_thr);
         bool connected{ true };
         while (connected) {
-            std::cout << "输入您要发送消息的ID：" << std::endl;
-            std::string s;
-            std::getline(std::cin, s);
-            int id{ stoi(s) };
+            std::cout << "输入ID(-2群发，多个空格分割的ID是向指定多人发送)：" << std::endl;
+            std::string s1, s2;
+            std::getline(std::cin, s1);
+            std::istringstream sin{ s1 };
             std::cout << "输入消息：" << std::endl;
-            std::getline(std::cin, s);
-            send_msg(id, s);
-            if (s == "exit") {
+            std::getline(std::cin, s2);
+            int id{ 0 };
+            while (sin >> id) {
+                send_msg(id, s2);
+            }
+            if (s2 == "exit") {
                 connected = false;
             }
         }
