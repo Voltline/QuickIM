@@ -1,6 +1,7 @@
 #ifndef QUICKIM_SERVER_H
 #define QUICKIM_SERVER_H
 #include <nlohmann/json.hpp>
+#include <spdlog/spdlog.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
@@ -22,9 +23,9 @@ private:
     int port;
     int sock_fd;
     std::vector<int> client_fds;
-    static std::map<int, pthread_t> thrs;
+    static std::map<int, pthread_t> thrs; // fd : thread_id
     static MessageQueue<MessageType> mq;
-    static std::map<int, int> account;
+    static std::map<int, int> account; // id : fd
 public:
     TCPServer() = default;
     TCPServer(const std::string& path);

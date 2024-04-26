@@ -11,7 +11,7 @@ TCPServer::TCPServer(const std::string& path)
     // 使用std::ifstream读取json内容
     std::ifstream config_file{ path };
     if (!config_file.is_open()) {
-        throw std::runtime_error{ "[Error]: Failed opening configuration file" };
+        throw std::runtime_error{ "Failed opening configuration file" };
     }
     nlohmann::json config;
     config_file >> config;
@@ -21,7 +21,7 @@ TCPServer::TCPServer(const std::string& path)
     // 初始化套接字
     sock_fd = socket(AF_INET, SOCK_STREAM, 0);
     if (sock_fd < 0) {
-        throw std::runtime_error{ "[Error]: Failed creating socket" };
+        throw std::runtime_error{ "Failed creating socket" };
     }
 
     // 设置服务器地址
@@ -33,12 +33,12 @@ TCPServer::TCPServer(const std::string& path)
 
     // 绑定地址和端口
     if (bind(sock_fd, (struct sockaddr*)&server_addr, sizeof(server_addr)) < 0) {
-        throw std::runtime_error{ "[Error]: Failed binding socket" };
+        throw std::runtime_error{ "Failed binding socket" };
     }
 
     // 开始监听连接
     if (listen(sock_fd, SOMAXCONN) < 0) {
-        throw std::runtime_error{ "[Error]: Failed listening on socket" };
+        throw std::runtime_error{ "Failed listening on socket" };
     }
 }
 
@@ -61,14 +61,14 @@ void TCPServer::accept_connection()
             socklen_t client_len = sizeof(client_addr);
             int client_fd{ accept(sock_fd, (struct sockaddr*)&client_addr, &client_len) };
             if (client_fd < 0) {
-                throw std::runtime_error{ "[Error]: Failed accepting client connection" };
+                throw std::runtime_error{ "Failed accepting client connection" };
             }
             client_fds.push_back(client_fd);
 
             // 处理客户端请求
             pthread_t tid;
             if (pthread_create(&tid, nullptr, handle_client_request, (void*)&client_fd)) {
-                std::cout << "[Warning]: Failed creating thread with client_fd : " << client_fd << std::endl;
+                spdlog::warn("Failed creating thread with client_fd: {}", client_fd);
                 close(client_fd);
                 continue;
             }
@@ -76,7 +76,7 @@ void TCPServer::accept_connection()
         }
     }
     catch (std::exception& e) {
-        std::cout << "[Error accept]: " << e.what() << std::endl;
+        spdlog::error(e.what());
     }
 }
 
@@ -90,14 +90,14 @@ void* TCPServer::handle_client_request(void* client_fd)
             if (bytes_received >= 0) {
                 buffer[bytes_received] = 0;
                 std::string buf{ buffer };
-                std::cout << buf << std::endl;
+                spdlog::info(buf);
                 nlohmann::json j{ nlohmann::json::parse(buf) };
                 int from_fd{ fd };
                 std::string msg{ j["msg"] };
                 if (msg == "exit") {
                     std::string response{ "Goodbye!" };
                     send(fd, response.c_str(), response.size(), 0);
-                    std::cout << "[Info]: client" << fd << " exits" << std::endl;
+                    spdlog::info("client{} exits", fd);
                     TCPServer::account.erase(j["from"]);
                     close(fd);
                     pthread_cancel(thrs[fd]);
@@ -111,7 +111,7 @@ void* TCPServer::handle_client_request(void* client_fd)
         }
     }
     catch (std::exception& e) {
-        std::cout << "[Error handle]: " << e.what() << std::endl;
+        spdlog::error(e.what());
     }
     pthread_exit(nullptr);
 }
@@ -126,17 +126,19 @@ void* TCPServer::start(void* p)
         std::string msg{ task.json["msg"] };
         if (to_id == -1) {
             if (TCPServer::account[from_id] != 0) {
+                int old_fd{ TCPServer::account[from_id] };
                 response = "refused";
-                send(from, response.c_str(), response.size(), 0);
-                std::cout << "[Info]: client" << from << " exits" << std::endl;
-                close(from);
+                send(old_fd, response.c_str(), response.size(), 0);
+                spdlog::info("client{} re-login", from);
+                close(old_fd);
+                TCPServer::account.erase(from_id);
+                pthread_cancel(thrs[old_fd]);
+                thrs.erase(old_fd);
             }
-            else {
-                TCPServer::account[from_id] = from;
-                response = "Welcome to QuickIM, User " + std::to_string(from_id);
-                send(from, response.c_str(), response.size(), 0);
-                std::cout << "[Info]: client" << from << " connects" << std::endl;
-            }
+            TCPServer::account[from_id] = from;
+            response = "Welcome to QuickIM, User " + std::to_string(from_id);
+            send(from, response.c_str(), response.size(), 0);
+            spdlog::info("client{} connects", from);
         }
         else {
             if (TCPServer::account[to_id] == 0) {

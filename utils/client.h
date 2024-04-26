@@ -1,6 +1,7 @@
 #ifndef QUICKIM_CLIENT_H
 #define QUICKIM_CLIENT_H
 #include <nlohmann/json.hpp>
+#include <spdlog/spdlog.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
@@ -20,6 +21,7 @@ private:
     int port;
     int sockfd;
     int iid;
+    static bool just_connect;
     pthread_t recv_thr;
 public:
     TCPClient() = default;

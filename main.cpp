@@ -6,8 +6,23 @@
 using namespace std;
 using json = nlohmann::json;
 
+void terminate_handle()
+{
+    try {
+        throw;
+    }
+    catch (std::exception& e) {
+        spdlog::error(e.what());
+    }
+    catch (...) {
+        spdlog::error("Unknown exception caught");
+    }
+    std::exit(EXIT_FAILURE);
+}
+
 int main(int argc, const char* argv[])
 {
+    std::set_terminate(terminate_handle);
     if (argc == 3) {
         TCPClient client{ "../config/config.json", stoi(argv[2]) };
         client.start();
