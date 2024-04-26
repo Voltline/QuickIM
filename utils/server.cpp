@@ -4,6 +4,7 @@
 
 MessageQueue<MessageType> TCPServer::mq = MessageQueue<MessageType>();
 std::map<int, int> TCPServer::account = std::map<int, int>();
+std::map<int, pthread_t> TCPServer::thrs = std::map<int, pthread_t>();
 
 TCPServer::TCPServer(const std::string& path)
 {
@@ -47,7 +48,7 @@ TCPServer::~TCPServer()
     for (auto client_fd : client_fds) {
         close(client_fd);
     }
-    for (auto tid : threads) {
+    for (auto [fd, tid] : thrs) {
         pthread_detach(tid);
     }
 }
@@ -71,7 +72,7 @@ void TCPServer::accept_connection()
                 close(client_fd);
                 continue;
             }
-            threads.push_back(tid);
+            thrs[client_fd] = tid;
         }
     }
     catch (std::exception& e) {
@@ -99,6 +100,8 @@ void* TCPServer::handle_client_request(void* client_fd)
                     std::cout << "[Info]: client" << fd << " exits" << std::endl;
                     TCPServer::account.erase(j["from"]);
                     close(fd);
+                    pthread_cancel(thrs[fd]);
+                    thrs.erase(fd);
                     break;
                 }
                 else {
@@ -137,7 +140,7 @@ void* TCPServer::start(void* p)
         }
         else {
             if (TCPServer::account[to_id] == 0) {
-                response = "[Warning]: User" + std::to_string(from_id) + " not exists";
+                response = "[Warning]: User" + std::to_string(to_id) + " not exists";
                 send(from, response.c_str(), response.size(), 0);
             }
             else {
