@@ -22,11 +22,12 @@ private:
     int port;
     int sockfd;
     int iid;
+    std::string name;
     static bool just_connect;
     pthread_t recv_thr;
 public:
     TCPClient() = default;
-    TCPClient(const std::string& path, int id);
+    TCPClient(const std::string& path, int id, const std::string& name_);
     TCPClient(const TCPClient&) = delete;
     ~TCPClient();
 

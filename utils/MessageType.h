@@ -6,8 +6,8 @@
 class MessageType
 {
 public:
-    int from_fd;
-    nlohmann::json json;
+int from_fd;
+nlohmann::json json;
 };
 
 #endif

@@ -3,8 +3,10 @@
 #include <set>
 
 bool TCPClient::just_connect = true;
+const std::string GREEN = "\033[32m";
+const std::string RESET = "\033[0m";
 
-TCPClient::TCPClient(const std::string& path, int id)
+TCPClient::TCPClient(const std::string& path, int id, const std::string& name_)
 {
     // 使用std::ifstream读取json内容
     just_connect = true;
@@ -18,6 +20,7 @@ TCPClient::TCPClient(const std::string& path, int id)
     port = config["port"];
     sockfd = -1;
     iid = id;
+    name = name_;
     connect_server();
 }
 
@@ -57,7 +60,8 @@ void TCPClient::send_msg(const Type& type, const nlohmann::json& id, const std::
      *  type为Type::Login时
      *  {
      *      "type": Type::Login,
-     *      "from": iid
+     *      "from": iid,
+     *      "name": name
      *  }
      *  type为Type::Exit时
      *  {
@@ -68,6 +72,7 @@ void TCPClient::send_msg(const Type& type, const nlohmann::json& id, const std::
     nlohmann::json json_obj;
     json_obj["type"] = type;
     json_obj["from"] = iid;
+    json_obj["name"] = name;
     if (type != Type::Login || type != Type::Exit) {
         json_obj["to"] = id;
         json_obj["msg"] = msg;
@@ -90,12 +95,33 @@ void* TCPClient::recv_msg(void* fd)
         }
 
         buffer[bytes_received] = 0;
-        if (strcmp(buffer, "refused") == 0) {
+        if (strcmp(buffer, "") == 0) throw std::runtime_error{ "服务器已关闭" };
+        // std::cout << buffer << std::endl; // Just for debug
+        nlohmann::json j{ nlohmann::json::parse(buffer) };
+        ResponseType t{ j["type"] };
+        if (t == ResponseType::Refused) {
             if (!just_connect) spdlog::warn("另一台设备正在登录");
             throw std::runtime_error{ "Server tells to exit" };
         }
-        if (strcmp(buffer, "") == 0) throw std::runtime_error{ "服务器已关闭" };
-        std::cout << buffer << std::endl;
+        else {
+            std::string msg{ j["msg"] };
+            if (t == ResponseType::Server) {
+                std::cout << "[Server] " << msg << std::endl;
+            }
+            else if (t == ResponseType::Client || t == ResponseType::Multicast) {
+                int from_id{ j["from"] };
+                std::cout << GREEN << "[" << std::string(j["from_name"]) << "(" << from_id << ")] "
+                << RESET << msg << std::endl;
+            }
+            else if (t == ResponseType::Broadcast) {
+                int from_id{ j["from"] };
+                std::cout << GREEN << "[广播 " << std::string(j["from_name"]) << "(" << from_id << ")] "
+                << RESET << msg << std::endl;
+            }
+            else if (t == ResponseType::Warn) {
+                spdlog::warn("服务器警告：{}", msg);
+            }
+        }
         just_connect = false;
     }
     pthread_exit(nullptr);

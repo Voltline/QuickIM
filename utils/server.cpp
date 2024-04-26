@@ -5,6 +5,7 @@
 MessageQueue<MessageType> TCPServer::mq = MessageQueue<MessageType>();
 std::map<int, int> TCPServer::account = std::map<int, int>();
 std::map<int, pthread_t> TCPServer::thrs = std::map<int, pthread_t>();
+std::map<int, std::string> TCPServer::info = std::map<int, std::string>();
 
 TCPServer::TCPServer(const std::string& path)
 {
@@ -94,7 +95,10 @@ void* TCPServer::handle_client_request(void* client_fd)
                 nlohmann::json j{ nlohmann::json::parse(buf) };
                 Type t{ j["type"] };
                 if (t == Type::Exit) {
-                    std::string response{ "Goodbye!" };
+                    nlohmann::json jdata;
+                    jdata["type"] = ResponseType::Server;
+                    jdata["msg"] = "Goodbye!";
+                    std::string response{ jdata.dump() };
                     send(fd, response.c_str(), response.size(), 0);
                     spdlog::info("client{} exits", fd);
                     TCPServer::account.erase(j["from"]);
@@ -124,9 +128,12 @@ void* TCPServer::start(void* p)
         int from{ task.from_fd };
         if (t == Type::Login) {
             int from_id{ task.json["from"] };
+            std::string nickname{ task.json["name"] };
             if (TCPServer::account[from_id] != 0) {
                 int old_fd{ TCPServer::account[from_id] };
-                response = "refused";
+                nlohmann::json jdata;
+                jdata["type"] = ResponseType::Refused;
+                response = jdata.dump();
                 send(old_fd, response.c_str(), response.size(), 0);
                 spdlog::info("client{} re-login", from);
                 close(old_fd);
@@ -134,43 +141,71 @@ void* TCPServer::start(void* p)
                 pthread_cancel(thrs[old_fd]);
                 thrs.erase(old_fd);
             }
+            nlohmann::json jdata;
             TCPServer::account[from_id] = from;
-            response = "[Server] Welcome to QuickIM, User " + std::to_string(from_id);
+            TCPServer::info[from_id] = task.json["name"];
+            jdata["type"] = ResponseType::Server;
+            jdata["msg"] = "Welcome to QuickIM, " + nickname + "(" + std::to_string(from_id) + ")!";
+            response = jdata.dump();
             send(from, response.c_str(), response.size(), 0);
             spdlog::info("client{} connects", from);
         }
         else {
             int from_id{ task.json["from"] };
             nlohmann::json to_id{ task.json["to"] };
+            nlohmann::json jdata;
             std::string msg{ task.json["msg"] };
             if (task.json["type"] == Type::Single) {
                 int to{ to_id[0] };
                 if (TCPServer::account[to] == 0) {
-                    response = "[Warning] User" + std::to_string(to) + " not exists";
+                    jdata["type"] = ResponseType::Warn;
+                    jdata["msg"] = "User " + std::to_string(to) + " not exists";
+                    response = jdata.dump();
                     send(from, response.c_str(), response.size(), 0);
                 }
                 else {
-                    msg = "[From " + std::to_string(from_id) + "]: " + msg;
-                    send(TCPServer::account[to], msg.c_str(), msg.size(), 0);
+                    jdata["type"] = ResponseType::Client;
+                    jdata["from"] = from_id;
+                    jdata["msg"] = msg;
+                    jdata["from_name"] = TCPServer::info[from_id];
+                    response = jdata.dump();
+                    send(TCPServer::account[to], response.c_str(), response.size(), 0);
                 }
             }
             else if (task.json["type"] == Type::Multi) {
-                msg = "[From " + std::to_string(from_id) + "] " + msg;
+                nlohmann::json jdata, warn_data;
+                jdata["type"] = ResponseType::Multicast;
+                jdata["from"] = from_id;
+                jdata["from_name"] = TCPServer::info[from_id];
+                jdata["msg"] = msg;
+                warn_data["type"] = ResponseType::Warn;
+                nlohmann::json users{ nlohmann::json::array() };
+                response = jdata.dump();
+                std::string warn_response;
                 for (const auto & i : to_id) {
                     if (TCPServer::account[i] == 0) {
-                        response = "[Warning] User" + std::to_string((int)i) + " not exists";
-                        send(from, response.c_str(), response.size(), 0);
+                        users.push_back(i);
                     }
                     else {
-                        send(TCPServer::account[i], msg.c_str(), msg.size(), 0);
+                        send(TCPServer::account[i], response.c_str(), response.size(), 0);
                     }
+                }
+                if (warn_data["users"].size() != 0) {
+                    warn_data["msg"] = "User " + users.dump() + " not exists";
+                    warn_response = warn_data.dump();
+                    send(from, warn_response.c_str(), warn_response.size(), 0);
                 }
             }
             else {
                 spdlog::info("client{} 发送了一条群发消息，内容为：{}", from_id, msg);
-                msg = "[群发][From " + std::to_string(from_id) + "] " + msg;
+                jdata["type"] = ResponseType::Broadcast;
+                jdata["from"] = from_id;
+                jdata["from_name"] = TCPServer::info[from_id];
+                jdata["msg"] = msg;
+                response = jdata.dump();
                 for (const auto& [user_id, user_fd] : account) {
-                    send(user_fd, msg.c_str(), msg.size(), 0);
+                    if (user_id != from_id)
+                        send(user_fd, response.c_str(), response.size(), 0);
                 }
             }
         }

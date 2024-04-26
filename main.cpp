@@ -24,7 +24,7 @@ int main(int argc, const char* argv[])
 {
     std::set_terminate(terminate_handle);
     if (argc == 3) {
-        TCPClient client{ "../config/config.json", stoi(argv[2]) };
+        TCPClient client{ "../config/config.json", stoi(argv[1]), argv[2] };
         client.start();
     }
     else {

@@ -27,6 +27,7 @@ private:
     static std::map<int, pthread_t> thrs; // fd : thread_id
     static MessageQueue<MessageType> mq;
     static std::map<int, int> account; // id : fd
+    static std::map<int, std::string> info; // id : name
 public:
     TCPServer() = default;
     TCPServer(const std::string& path);
