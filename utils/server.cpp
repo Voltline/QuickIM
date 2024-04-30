@@ -148,7 +148,7 @@ void* TCPServer::start(void* p)
             jdata["msg"] = "Welcome to QuickIM, " + nickname + "(" + std::to_string(from_id) + ")!";
             response = jdata.dump();
             send(from, response.c_str(), response.size(), 0);
-            spdlog::info("client{} connects", from);
+            spdlog::info("{}({}) connects", nickname, from_id);
         }
         else {
             int from_id{ task.json["from"] };
@@ -197,7 +197,7 @@ void* TCPServer::start(void* p)
                 }
             }
             else {
-                spdlog::info("client{} 发送了一条群发消息，内容为：{}", from_id, msg);
+                spdlog::info("{}({}) 发送了一条群发消息，内容为：{}",TCPServer::info[from_id], from_id, msg);
                 jdata["type"] = ResponseType::Broadcast;
                 jdata["from"] = from_id;
                 jdata["from_name"] = TCPServer::info[from_id];

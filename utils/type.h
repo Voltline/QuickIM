@@ -3,12 +3,12 @@
 
 enum Type
 {
-    Login, Exit, Single, Multi, All
+    Login, Exit, Single, Multi, All, Key
 };
 
 enum ResponseType
 {
-    Refused, Server, Client, Broadcast, Multicast, File, Warn
+    Refused, Server, Client, Broadcast, Multicast, File, Warn, PubKey
 };
 
 #endif
