@@ -16,10 +16,32 @@
 ## 注意事项
 * 此项目基于POSIX下的套接字、多线程库开发，仅能在UNIX和类UNIX系统下运行
 * 推荐使用各种Linux发行版与macOS
+* 本项目使用OpenSSL库，请务必在构建前安装：
+```bash
+# macOS
+brew install openssl
+
+# Debian/Ubuntu
+sudo apt-get install openssl
+
+# CentOS
+sudo yum install openssl
+```
 
 ## Caution
 * The project based on POSIX socket and pthread library. So it can just run on UNIX/UNIX-like OS.
 * Recommend to use various Linux releases or macOS to run this project
+* You need to prepare OpenSSL environment before building this project:
+```bash
+# macOS
+brew install openssl
+
+# Debian/Ubuntu
+sudo apt-get install openssl
+
+# CentOS
+sudo yum install openssl
+```
 
 ## 项目信息/About QuickIM
 ### 语言/Lang
@@ -27,6 +49,7 @@
 ### 第三方库/Third-Party Library
 * nlohmann json
 * spdlog
+* OpenSSL
 ### 开源协议/Open-Source Protocol
 * MIT
 
