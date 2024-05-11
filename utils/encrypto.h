@@ -1,9 +1,10 @@
 #ifndef QUICKIM_ENCRYPTO_H
 #define QUICKIM_ENCRYPTO_H
-#define OPENSSL_API_COMPAT 908
 #include <openssl/pem.h>
 #include <openssl/rsa.h>
 #include <openssl/err.h>
+#include <openssl/aes.h>
+#include <openssl/rand.h>
 #include <spdlog/spdlog.h>
 #include <string>
 #include <tuple>
@@ -12,28 +13,40 @@ constexpr int KEY_LENGTH{ 1024 };
 class RSAClient
 {
 private:
-    std::string private_key;
-    std::string public_key;
+    RSA* rsaPublicKey;
+    RSA* rsaPrivateKey;
+
 public:
     RSAClient();
-    RSAClient(const std::string& pub_key);
-    RSAClient(const RSAClient&) = delete;
-    ~RSAClient() = default;
+    RSAClient(const std::string& publicKeyString);
+    ~RSAClient();
 
-    std::string private_key_encrypt(const std::string& origin_text) const;
-    std::string public_key_encrypt(const std::string& origin_text) const;
-    std::string private_key_decrypt(const std::string& secret_text) const;
-    std::string public_key_decrypt(const std::string& secret_text) const;
+    std::string encryptWithPublicKey(const std::string& plaintext);
+    std::string decryptWithPrivateKey(const std::string& ciphertext);
+
+    std::string encryptWithPrivateKey(const std::string& plaintext);
+    std::string decryptWithPublicKey(const std::string& ciphertext);
+
+    std::string getPublicKeyString() const;
+    std::string getPrivateKeyString() const;
 };
 
 class AESClient
 {
 private:
-    std::string key;
+    AES_KEY aesKey;
+    unsigned char iv[AES_BLOCK_SIZE];
+
 public:
     AESClient();
-    AESClient(const std::string& key);
+    AESClient(const std::string& key, const std::string& initializationVector);
     ~AESClient() = default;
+
+    std::string encrypt(const std::string& plaintext);
+    std::string decrypt(const std::string& ciphertext, const std::string& receivedIV);
+
+private:
+    void generateRandomIV();
 };
 
 #endif
