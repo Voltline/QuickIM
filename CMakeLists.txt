@@ -10,6 +10,7 @@ add_executable(QuickIM
         utils/client.cpp
         utils/server.cpp
         utils/encrypto.cpp
+        utils/dbhandler.cpp
 )
 
 find_package(OpenSSL REQUIRED)

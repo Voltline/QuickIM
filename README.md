@@ -27,6 +27,8 @@ sudo apt-get install openssl
 # CentOS
 sudo yum install openssl
 ```
+* 本项目使用的nlohnmann json库、spdlog库已包含在项目中，无需额外安装，而boost、boost/mysql库需要自行安装
+* 推荐使用vcpkg安装boost以及boost/mysql库
 
 ## Caution
 * The project based on POSIX socket and pthread library. So it can just run on UNIX/UNIX-like OS.
@@ -42,6 +44,8 @@ sudo apt-get install openssl
 # CentOS
 sudo yum install openssl
 ```
+* The nlohmann json library and spdlog library are included in this project, so you don't need to install them. But you need to install boost and boost/mysql library by yourself.
+* Recommend to use vcpkg to install boost and boost/mysql library
 
 ## 项目信息/About QuickIM
 ### 语言/Lang
@@ -50,6 +54,8 @@ sudo yum install openssl
 * nlohmann json
 * spdlog
 * OpenSSL
+* boost
+* boost/mysql
 ### 开源协议/Open-Source Protocol
 * MIT
 
